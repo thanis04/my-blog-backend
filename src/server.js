@@ -18,7 +18,7 @@ app.get('/api/articles/:name', async (req, res) => {
     
 });
 
-app.put('/api/articles/:name/upvotes', async (req, res) => {
+app.put('/api/articles/:name/upvote', async (req, res) => {
     const { name } = req.params;
 
     await db.collection('articles').updateOne({ name }, {
@@ -28,7 +28,7 @@ app.put('/api/articles/:name/upvotes', async (req, res) => {
     const article = await db.collection('articles').findOne({ name });
 
     if (article) {
-        res.send(`The ${name} article now has ${article.upvotes} upvotes`);
+        res.json(article);
     } else {
         res.send('That article does\'t exists');
     }
@@ -44,9 +44,8 @@ app.post('/api/articles/:name/comments', async (req, res) => {
 
     const article = await db.collection('articles').findOne({ name });
 
-    if (article) {
-        article.comments.push({ postedBy, text });
-        res.send(article.comments);
+    if (article) {       
+        res.json(article);
     } else {
         res.send('That article does\'t exists');
     }
