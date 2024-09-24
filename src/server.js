@@ -21,9 +21,12 @@ app.use(async (req, res, next) => {
         try {
             req.user = await admin.auth().verifyIdToken(authToken);
         } catch(e) {
-            res.sendStatus(400);
+            return res.sendStatus(400);
         }
     }
+    
+    req.user = req.user || {};
+
     next(); 
 });
 
@@ -40,21 +43,35 @@ app.get('/api/articles/:name', async (req, res) => {
     } else {
         res.sendStatus(404);
     }
+});
 
-    
+app.use((req, res, next) => {
+    if (req.user) {
+        next();
+    } else {
+        res.sendStatus(401);
+    }
 });
 
 app.put('/api/articles/:name/upvote', async (req, res) => {
     const { name } = req.params;
-
-    await db.collection('articles').updateOne({ name }, {
-        $inc: { upvotes: 1 },
-    });
+    const { uid } = req.user;
 
     const article = await db.collection('articles').findOne({ name });
-
+    
     if (article) {
-        res.json(article);
+        const upvoteIds = article.upvoteIds || [];
+        const canUpvote = uid && !upvoteIds.include(uid);
+        
+        if (canUpvote) {
+            await db.collection('articles').updateOne({ name }, {
+                $inc: { upvotes: 1 },
+                $push: { upvoteIds: uid }
+            });
+        }
+
+        const updatedArticle = await db.collection('articles').findOne({ name });
+        res.json(updatedArticle);
     } else {
         res.send('That article does\'t exists');
     }
@@ -62,10 +79,11 @@ app.put('/api/articles/:name/upvote', async (req, res) => {
 
 app.post('/api/articles/:name/comments', async (req, res) => {
     const { name } = req.params;
-    const { postedBy, text } = req.body;
+    const { text } = req.body;
+    const { email } = req.user;
 
     await db.collection('articles').updateOne({ name }, {
-        $push: { comments: {postedBy, text} },
+        $push: { comments: {postedBy: email, text} },
     });
 
     const article = await db.collection('articles').findOne({ name });
